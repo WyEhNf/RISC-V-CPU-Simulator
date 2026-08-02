@@ -1,10 +1,22 @@
-# LaTeX 编译临时文件
-*.aux
-*.log
-*.nav
-*.out
-*.snm
-*.toc
+# Local build products
+/build/
+/build-*/
+/cmake-build-*/
+/CMakeFiles/
+/CMakeCache.txt
+/CTestTestfile.cmake
+/Testing/
+/Makefile
+/cmake_install.cmake
+/IMPLEMENTATION_GUIDE.md
+*.exe
+*.obj
+*.o
+*.pdb
 
-# JetBrains IDE (CLion / IDEA) 缓存
-.idea/
+# Copied validation/reference material. These files stay on disk but are not
+# intended to be committed with the exercise implementation.
+/tests/
+/data/
+/issue.pdf
+
