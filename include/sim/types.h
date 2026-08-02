@@ -18,9 +18,9 @@ using i32 = int32_t;
 constexpr u32 MemorySize = 1 << 18, RN = 32, RBN = 32, RSN = 32, LSN = 32,
               BHTN = 1 << 12, TERM = 0x0ff00513u;
 enum Op : u8 { R, IA, IS, IM, IC, S, B, U, J, FN, INV };
-enum AF : u8 { ADD, SUB, AND, OR, XOR, SLL, SRL, SLT, SLTU, NOP };
+enum AF : u8 { ADD, SUB, AND, OR, XOR, SLL, SRL,SRA,SLT, SLTU, NOP };
 enum BF : u8 { EQ, NE, LT, LTU, GE, GEU, NOBR };
-enum MF : u8 { MW, MH, MHU, MV, MBU, SW, SH, SB, NOM };
+enum MF : u8 { MW, MH, MHU, MV, MBU,SW, SH, SB, NOM };
 enum TK : u8 { TN, TROB, TRS, TLSQ };
 
 struct Tag {
