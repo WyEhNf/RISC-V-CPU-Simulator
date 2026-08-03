@@ -79,11 +79,11 @@ struct LSQ {
   }
 };
 struct LSQState {
-  u32 h, tx;
+  u32 head, tail;
   LSQEntry e[LSN];
 
   void reset() { *this = LSQState{}; }
-  bool full() const { return (tx + 1) % LSN == h; }
+  bool full() const { return (tail + 1) % LSN == head; }
 
   MemoryRequest evaluate(const ROBState &rob,
                          const MemoryPipelineState &memory) const {
@@ -91,25 +91,25 @@ struct LSQState {
     if (memory.busy)
       return output;
 
-    if (h != tx) {
-      const LSQEntry &head = e[h];
-      if (head.busy && !head.il && head.val_rdy && !head.request_pending &&
-          !head.memory_complete && rob.tag_live(head.rt) &&
-          rob.h == head.rt.i && rob.e[rob.h].tag == head.rt) {
+    if (head != tail) {
+      const LSQEntry &header = e[head];
+      if (header.busy && !header.il && header.val_rdy && !header.request_pending &&
+          !header.memory_complete && rob.tag_live(header.rt) &&
+          rob.head == header.rt.i && rob.e[rob.head].tag == header.rt) {
         output.valid = true;
         output.store = true;
-        output.lsq_slot = h;
-        output.tag = head.rt;
-        output.address = head.addr;
-        output.forwarded_value = head.val;
-        output.operation = head.ins.mem;
+        output.lsq_slot = head;
+        output.tag = header.rt;
+        output.address = header.addr;
+        output.forwarded_value = header.val;
+        output.operation = header.ins.mem;
         return output;
       }
     }
 
     for (u32 offset = 0; offset < LSN; ++offset) {
-      const u32 i = (h + offset) % LSN;
-      if (i == tx)
+      const u32 i = (head + offset) % LSN;
+      if (i == tail)
         break;
       const LSQEntry &entry = e[i];
       if (!entry.busy || !entry.il || entry.val_rdy || entry.request_pending ||
@@ -119,7 +119,7 @@ struct LSQState {
       bool blocked = false, forwarded = false;
       u32 value = 0;
       for (u32 older_offset = 0; older_offset < LSN; ++older_offset) {
-        const u32 j = (h + older_offset) % LSN;
+        const u32 j = (head + older_offset) % LSN;
         if (j == i)
           break;
         const LSQEntry &older = e[j];
@@ -158,14 +158,14 @@ struct LSQState {
       candidate = LSQState{};
     } else {
       if (wires.commit.valid && wires.commit.memory_op &&
-          candidate.h != candidate.tx) {
-        candidate.e[candidate.h] = LSQEntry{};
-        candidate.h = (candidate.h + 1) % LSN;
+          candidate.head != candidate.tail) {
+        candidate.e[candidate.head] = LSQEntry{};
+        candidate.head = (candidate.head + 1) % LSN;
       }
       if (wires.cdb.execute_accepted && wires.execute.memory_op) {
         for (u32 offset = 0; offset < LSN; ++offset) {
-          const u32 i = (candidate.h + offset) % LSN;
-          if (i == candidate.tx)
+          const u32 i = (candidate.head + offset) % LSN;
+          if (i == candidate.tail)
             break;
           LSQEntry &entry = candidate.e[i];
           if (!entry.busy || entry.rt != wires.execute.tag)
@@ -202,7 +202,7 @@ struct LSQState {
         entry.il = wires.issue.ins.il;
         entry.rt = wires.issue.tag;
         entry.ins = wires.issue.ins;
-        candidate.tx = (wires.issue.lsq_slot + 1) % LSN;
+        candidate.tail = (wires.issue.lsq_slot + 1) % LSN;
       }
     }
     *this = candidate;

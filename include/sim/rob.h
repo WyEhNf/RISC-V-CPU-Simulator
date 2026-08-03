@@ -57,7 +57,7 @@ struct ROB {
 // the following is the real implementation in tomasulo, which holds same but
 // match the ends.
 struct ROBState {
-  u32 h, tx, generation[RBN];
+  u32 head, tail, generation[RBN];
   ROBEntry e[RBN];
 
   void reset() { *this = ROBState{}; }
@@ -68,24 +68,24 @@ struct ROBState {
   }
 
   bool tag_live(Tag tag) const {
-    return tag.k == TROB && tag.i < RBN && in_ring(tag.i, h, tx) &&
+    return tag.k == TROB && tag.i < RBN && in_ring(tag.i, head, tail) &&
            e[tag.i].tag == tag;
   }
 
-  bool full() const { return (tx + 1) % RBN == h; }
+  bool full() const { return (tail + 1) % RBN == head; }
 
   Tag next_tag() const {
-    u32 next_generation = generation[tx] + 1;
+    u32 next_generation = generation[tail] + 1;
     if (next_generation == 0)
       ++next_generation;
-    return Tag{TROB, tx, next_generation};
+    return Tag{TROB, tail, next_generation};
   }
 
   CommitOutput evaluate(u32 committed_x10) const {
     CommitOutput output{};
-    if (h == tx)
+    if (head == tail)
       return output;
-    const ROBEntry &entry = e[h];
+    const ROBEntry &entry = e[head];
     if (!entry.rdy || !tag_live(entry.tag))
       return output;
 
@@ -117,13 +117,13 @@ struct ROBState {
   void latch(const CycleWires &wires) {
     ROBState candidate = *this;
     if (wires.commit.valid) {
-      candidate.e[candidate.h] = ROBEntry{};
-      candidate.h = (candidate.h + 1) % RBN;
+      candidate.e[candidate.head] = ROBEntry{};
+      candidate.head = (candidate.head + 1) % RBN;
     }
     if (wires.commit.mispredict) {
       for (u32 i = 0; i < RBN; ++i)
         candidate.e[i] = ROBEntry{};
-      candidate.tx = candidate.h;
+      candidate.tail = candidate.head;
     } else if (!wires.commit.terminate) {
       if (wires.cdb.execute_accepted && wires.execute.memory_op &&
           wires.execute.tag.i < RBN &&
@@ -156,7 +156,7 @@ struct ROBState {
         entry.pt = wires.issue.predicted_taken;
         entry.rdy = wires.issue.ins.op == FN;
         candidate.generation[wires.issue.rob_slot] = wires.issue.tag.generation;
-        candidate.tx = (wires.issue.rob_slot + 1) % RBN;
+        candidate.tail = (wires.issue.rob_slot + 1) % RBN;
       }
     }
     *this = candidate;
