@@ -7,7 +7,7 @@ inline u32 ex(u32 mask, int l, int r) {
 }
 inline i32 sx(u32 v, int b) {
   const u32 sign_bit = 1u << b;
-  return static_cast<i32>(v ^ (sign_bit - 1u) - sign_bit);
+  return static_cast<i32>((v ^ sign_bit) - sign_bit);
 }
 
 inline Ins decode(u32 raw) {
