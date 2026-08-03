@@ -15,7 +15,7 @@ struct RS {
   void reset() { memset(this, 0, sizeof(*this)); }
   void tick() { memcpy(e[0], e[1], sizeof(e[0])); }
   
-  u32 allocate(const Ins &ins, u32 v1, u32 v2, Tag q1, Tag q2, Tag rob_tag,
+  u32 allocate(const Ins &ins, u32 v1, Tag q1, u32 v2, Tag q2, Tag rob_tag,
                u32 pc) {
     for (u32 i = 0; i < RSN; i++) {
       if (!e[0][i].busy && !e[1][i].busy) {
