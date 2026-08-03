@@ -26,4 +26,5 @@ int main(int argc, char **argv) {
     }
   }
   fprintf(stderr, "Simulator exceeded max cycles\n");
+  return 1;
 }
