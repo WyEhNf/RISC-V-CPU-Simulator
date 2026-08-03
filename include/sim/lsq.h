@@ -49,7 +49,7 @@ struct LSQ {
     e[1][idx].val_rdy = 1;
   }
   void set_rdy(u32 idx,u32 val) {
-    e[1][idx].val_rdy = val;
+    e[1][idx].val = val;
     e[1][idx].addr_rdy = 1;
   }
   LSQEntry &get(u32 idx) { return e[0][idx]; }

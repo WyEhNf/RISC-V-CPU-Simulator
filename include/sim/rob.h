@@ -37,7 +37,7 @@ struct ROB {
   }
   bool head_ready() const { return head[0] != tail[0] && e[0][head[0]].rdy; }
   ROBEntry head_entry() const { return e[0][head[0]]; }
-  void advance_head() { head[0] = (head[0] + 1) % RBN; }
+  void advance_head() { head[1] = (head[0] + 1) % RBN; }
   void flush_younger(u32 from_idx) { tail[1] = from_idx; }
   void set_term(u32 v) {
     term = 1;
