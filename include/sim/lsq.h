@@ -1,12 +1,15 @@
 #pragma once
 #include "sim/memory.h"
 #include "sim/types.h"
+#include "sim/module_io.h"'
+#include "sim/rob.h"
 
 namespace sim {
 struct LSQEntry {
-  bool busy, val_rdy, addr_rdy, il;
+  bool busy, val_rdy, addr_rdy,request_pending, memory_complete,il;
   u32 val, addr;
   Tag rt;
+  Ins ins;
 };
 struct LSQ {
   LSQEntry e[2][LSN];
@@ -74,5 +77,139 @@ struct LSQ {
     }
     return -1;
   }
+
+
+// the following is the real implementation in tomasulo, which holds same but match the ends.
+
+struct LSQState {
+  u32 h, tx;
+  LSQEntry e[LSN];
+
+  void reset() { *this = LSQState{}; }
+  bool full() const { return (tx + 1) % LSN == h; }
+
+  MemoryRequest evaluate(const ROBState &rob,
+                         const MemoryPipelineState &memory) const {
+    MemoryRequest output{};
+    if (memory.busy)
+      return output;
+
+    if (h != tx) {
+      const LSQEntry &head = e[h];
+      if (head.busy && !head.il && head.val_rdy && !head.request_pending &&
+          !head.memory_complete && rob.tag_live(head.rt) &&
+          rob.h == head.rt.i && rob.e[rob.h].tag == head.rt) {
+        output.valid = true;
+        output.store = true;
+        output.lsq_slot = h;
+        output.tag = head.rt;
+        output.address = head.addr;
+        output.forwarded_value = head.val;
+        output.operation = head.ins.mem;
+        return output;
+      }
+    }
+
+    for (u32 offset = 0; offset < LSN; ++offset) {
+      const u32 i = (h + offset) % LSN;
+      if (i == tx)
+        break;
+      const LSQEntry &entry = e[i];
+      if (!entry.busy || !entry.il || entry.val_rdy || entry.request_pending ||
+          !entry.addr_rdy || !rob.tag_live(entry.rt))
+        continue;
+
+      bool blocked = false, forwarded = false;
+      u32 value = 0;
+      for (u32 older_offset = 0; older_offset < LSN; ++older_offset) {
+        const u32 j = (h + older_offset) % LSN;
+        if (j == i)
+          break;
+        const LSQEntry &older = e[j];
+        if (!older.busy || older.il)
+          continue;
+        if (!older.addr_rdy) {
+          blocked = true;
+          break;
+        }
+        if (older.addr == entry.addr) {
+          if (!older.val_rdy) {
+            blocked = true;
+            break;
+          }
+          value = older.val;
+          forwarded = true;
+        }
+      }
+      if (blocked)
+        continue;
+      output.valid = true;
+      output.lsq_slot = i;
+      output.tag = entry.rt;
+      output.address = entry.addr;
+      output.operation = entry.ins.mem;
+      output.forwarded = forwarded;
+      output.forwarded_value = value;
+      break;
+    }
+    return output;
+  }
+
+  void latch(const CycleWires &wires) {
+    LSQState candidate = *this;
+    if (wires.commit.mispredict || wires.commit.terminate) {
+      candidate = LSQState{};
+    } else {
+      if (wires.commit.valid && wires.commit.memory_op &&
+          candidate.h != candidate.tx) {
+        candidate.e[candidate.h] = LSQEntry{};
+        candidate.h = (candidate.h + 1) % LSN;
+      }
+      if (wires.cdb.execute_accepted && wires.execute.memory_op) {
+        for (u32 offset = 0; offset < LSN; ++offset) {
+          const u32 i = (candidate.h + offset) % LSN;
+          if (i == candidate.tx)
+            break;
+          LSQEntry &entry = candidate.e[i];
+          if (!entry.busy || entry.rt != wires.execute.tag)
+            continue;
+          entry.addr = wires.execute.result.v;
+          entry.addr_rdy = true;
+          if (!entry.il) {
+            entry.val_rdy = true;
+            entry.val = wires.execute.store_value;
+          }
+          break;
+        }
+      }
+      if (wires.memory_request.valid && wires.memory_request.lsq_slot < LSN) {
+        LSQEntry &entry = candidate.e[wires.memory_request.lsq_slot];
+        if (entry.busy && entry.rt == wires.memory_request.tag)
+          entry.request_pending = true;
+      }
+      if (wires.memory.valid && wires.memory.lsq_slot < LSN) {
+        LSQEntry &entry = candidate.e[wires.memory.lsq_slot];
+        if (entry.busy && entry.rt == wires.memory.tag) {
+          entry.request_pending = false;
+          entry.memory_complete = true;
+          if (!wires.memory.store) {
+            entry.val_rdy = true;
+            entry.val = wires.memory.value;
+          }
+        }
+      }
+      if (accept_issue(wires) && wires.issue.memory_op) {
+        LSQEntry &entry = candidate.e[wires.issue.lsq_slot];
+        entry = LSQEntry{};
+        entry.busy = true;
+        entry.il = wires.issue.ins.il;
+        entry.rt = wires.issue.tag;
+        entry.ins = wires.issue.ins;
+        candidate.tx = (wires.issue.lsq_slot + 1) % LSN;
+      }
+    }
+    *this = candidate;
+  }
+};
 
 }; // namespace sim

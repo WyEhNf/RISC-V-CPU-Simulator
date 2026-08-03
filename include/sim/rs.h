@@ -1,5 +1,7 @@
 #pragma once
 #include "sim/types.h"
+#include "module_io.h"
+#include "rob.h"
 namespace sim {
 struct RSEntry {
   bool busy;
@@ -75,4 +77,84 @@ struct RS {
     }
   }
 };
+
+
+//the following is the real implementation in tomasulo, which holds same but match the ends.
+
+struct RSState {
+  RSEntry e[RSN];
+
+  void reset() { *this = RSState{}; }
+
+  u32 find_free() const {
+    for (u32 i = 0; i < RSN; ++i)
+      if (!e[i].busy)
+        return i;
+    return RSN;
+  }
+
+  ExecuteOutput evaluate(const ROBState &rob) const {
+    ExecuteOutput output{};
+    for (u32 i = 0; i < RSN; ++i) {
+      const RSEntry &entry = e[i];
+      if (!entry.busy || entry.q1.isvalid() || entry.q2.isvalid() ||
+          !rob.tag_live(entry.rt))
+        continue;
+      output.valid = true;
+      output.rs_slot = i;
+      output.tag = entry.rt;
+      output.ins = entry.ins;
+      output.store_value = entry.v2;
+      output.result = alu(entry.ins, entry.v1, entry.v2, entry.pc);
+      output.memory_op = output.result.mem;
+      break;
+    }
+    return output;
+  }
+
+  static void wakeup_entry(RSEntry &entry, Tag tag, u32 value) {
+    if (!entry.busy || !tag.isvalid())
+      return;
+    if (entry.q1 == tag) {
+      entry.q1 = Tag{};
+      entry.v1 = value;
+    }
+    if (entry.q2 == tag) {
+      entry.q2 = Tag{};
+      entry.v2 = value;
+    }
+  }
+
+  void latch(const CycleWires &wires) {
+    RSState candidate = *this;
+    if (squash_cycle(wires)) {
+      candidate = RSState{};
+    } else {
+      if (wires.cdb.execute_accepted)
+        candidate.e[wires.execute.rs_slot] = RSEntry{};
+      if (accept_issue(wires) && wires.issue.uses_rs) {
+        RSEntry &entry = candidate.e[wires.issue.rs_slot];
+        entry = RSEntry{};
+        entry.busy = true;
+        entry.ins = wires.issue.ins;
+        entry.v1 = wires.issue.v1;
+        entry.v2 = wires.issue.v2;
+        entry.q1 = wires.issue.q1;
+        entry.q2 = wires.issue.q2;
+        entry.rt = wires.issue.tag;
+        entry.pc = wires.issue.pc;
+      }
+      for (u32 i = 0; i < RSN; ++i) {
+        if (wires.cdb.valid)
+          wakeup_entry(candidate.e[i], wires.cdb.tag, wires.cdb.value);
+        if (wires.commit.write_reg)
+          wakeup_entry(candidate.e[i], wires.commit.tag, wires.commit.value);
+      }
+    }
+    *this = candidate;
+  }
+
+
+};
+
 } // namespace sim

@@ -24,4 +24,6 @@ struct RegFile {
   Tag rat_cur(u8 rd) const { return rd ? rt[rd] : Tag{}; }
 };
 
+using RegState = RegFile;
+
 } // namespace sim

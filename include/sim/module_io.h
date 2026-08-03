@@ -36,11 +36,16 @@ struct MemoryOutput {
   MF operation;
 };
 struct IssueOutput {
-  bool valid, invalid_instruction, memory_op, predicted_taken, users_rs;
+  bool valid, invalid_instruction, memory_op, predicted_taken, uses_rs;
   u32 pc, raw, rob_slot, rs_slot, lsq_slot, next_pc;
   Ins ins;
   Tag tag, q1, q2;
   u32 v1, v2;
+};
+struct CDBoutput {
+  bool valid,execute_accepted;
+  Tag tag;
+  u32 value;
 };
 struct CycleWires {
   CommitOutput commit;
@@ -48,15 +53,10 @@ struct CycleWires {
   MemoryOutput memory;
   MemoryRequest memory_request;
   IssueOutput issue;
-  bool execute_accpted, cdb_valid, fault_request;
-  Tag cdb_tag;
-  u32 cdb_value;
+  CDBoutput cdb;
+  bool fault_request;
 };
-struct CDBoutput {
-  bool valid,excute_accepted;
-  Tag tag;
-  u32 value;
-};
+
 inline bool squash_cycle(const CycleWires &wires) {
   return wires.commit.terminate || wires.commit.mispredict;
 }
