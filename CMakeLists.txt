@@ -12,10 +12,15 @@ if(BUILD_TESTING)
       test_m0
       test_reference
       test_predictor
+      test_cdb
       test_regfile
+      test_regfile_state
       test_rob
+      test_rob_state
       test_rs
+      test_rs_state
       test_lsq
+      test_lsq_state
       test_pipeline
       test_tomasulo)
 

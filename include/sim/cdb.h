@@ -2,11 +2,11 @@
 #include "sim/module_io.h"
 namespace sim
 {
-struct CBDArbiter
+struct CDBArbiter
 {
-  CDBoutput evaluate(const ExecuteOutput &execute, const MemoryOutput &memory) const 
+  CDBOutput evaluate(const ExecuteOutput &execute, const MemoryOutput &memory) const 
   {
-    CDBoutput output{};
+    CDBOutput output{};
    if(memory.valid&&!memory.store){
     output.valid=1;
     output.tag=memory.tag;
@@ -15,9 +15,9 @@ struct CBDArbiter
 
    if(execute.valid){
     if(execute.memory_op){
-        output.excute_accepted=1;
+        output.execute_accepted=1;
     }else if(!output.valid){
-        output.excute_accepted=1;
+        output.execute_accepted=1;
         output.valid=1;
         output.tag=execute.tag;
         output.value=execute.result.v;

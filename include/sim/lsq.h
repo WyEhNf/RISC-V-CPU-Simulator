@@ -1,12 +1,12 @@
 #pragma once
 #include "sim/memory.h"
-#include "sim/types.h"
-#include "sim/module_io.h"'
+#include "sim/module_io.h"
 #include "sim/rob.h"
+#include "sim/types.h"
 
 namespace sim {
 struct LSQEntry {
-  bool busy, val_rdy, addr_rdy,request_pending, memory_complete,il;
+  bool busy, val_rdy, addr_rdy, request_pending, memory_complete, il;
   u32 val, addr;
   Tag rt;
   Ins ins;
@@ -51,7 +51,7 @@ struct LSQ {
     e[1][idx].val = val;
     e[1][idx].val_rdy = 1;
   }
-  void set_rdy(u32 idx,u32 val) {
+  void set_rdy(u32 idx, u32 val) {
     e[1][idx].val = val;
     e[1][idx].addr_rdy = 1;
   }
@@ -77,10 +77,7 @@ struct LSQ {
     }
     return -1;
   }
-
-
-// the following is the real implementation in tomasulo, which holds same but match the ends.
-
+};
 struct LSQState {
   u32 h, tx;
   LSQEntry e[LSN];
@@ -211,5 +208,4 @@ struct LSQState {
     *this = candidate;
   }
 };
-
-}; // namespace sim
+} // namespace sim

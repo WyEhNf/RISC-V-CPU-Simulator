@@ -42,7 +42,7 @@ struct IssueOutput {
   Tag tag, q1, q2;
   u32 v1, v2;
 };
-struct CDBoutput {
+struct CDBOutput {
   bool valid,execute_accepted;
   Tag tag;
   u32 value;
@@ -53,7 +53,7 @@ struct CycleWires {
   MemoryOutput memory;
   MemoryRequest memory_request;
   IssueOutput issue;
-  CDBoutput cdb;
+  CDBOutput cdb;
   bool fault_request;
 };
 
