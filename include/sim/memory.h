@@ -25,7 +25,7 @@ struct Mem {
     memset(m, 0, sizeof(m));
     u32 address = 0;
     const char *cursor = image;
-    for (; cursor != '\0';) {
+    for (; *cursor != '\0';) {
       if (*cursor == '@') {
         cursor++;
         u32 parsed = 0;
@@ -102,6 +102,15 @@ struct Mem {
         m[address] = static_cast<u8>((high << 4) | low);
       address++;
     }
+  }
+  u32 ifetch(u32 address) const {
+    if (!in_bounds(address, 4))
+      return 0;
+    u32 value = static_cast<u32>(m[address]);
+    value |= static_cast<u32>(m[address + 1]) << 8;
+    value |= static_cast<u32>(m[address + 2]) << 16;
+    value |= static_cast<u32>(m[address + 3]) << 24;
+    return value;
   }
   u32 dread(u32 address, u8 size, bool sign_extend) const {
     const u32 bytes = size == 2 ? 4u : size == 1 ? 2u : 1u;
