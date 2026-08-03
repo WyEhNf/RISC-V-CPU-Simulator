@@ -52,7 +52,11 @@ struct CycleWires {
   Tag cdb_tag;
   u32 cdb_value;
 };
-
+struct CDBoutput {
+  bool valid,excute_accepted;
+  Tag tag;
+  u32 value;
+};
 inline bool squash_cycle(const CycleWires &wires) {
   return wires.commit.terminate || wires.commit.mispredict;
 }
