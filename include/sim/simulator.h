@@ -12,7 +12,6 @@
 #include "sim/types.h"
 #include <cstdio>
 
-
 namespace sim {
 struct Simulator {
   enum Module : u8 {
@@ -30,6 +29,7 @@ struct Simulator {
   Predictor prd;
   RegState rf;
   RSState rs;
+  ROBState rob;
   LSQState lsq;
   MemoryPipelineState memory_pipe;
 
@@ -96,7 +96,6 @@ struct Simulator {
   }
 
   static MemoryOutput evaluate_memory(const MemoryPipelineState &ppl,
-                                      const MemoryRequest &request,
                                       const Mem &mem_in) {
     MemoryOutput output{};
     if (!ppl.busy || ppl.remaining != 1)
@@ -151,37 +150,68 @@ struct Simulator {
       if (rs_slot == RSN)
         return output;
     }
-    output.valid=1;
-    output.pc=current_pc;
-    output.raw=raw;
-    output.ins=ins;
-    output.rob_slot=rob_in.tail;
-    output.rs_slot=rs_slot;
-    output.lsq_slot=lsq_in.tail;
-    output.memory_op=ins.il||ins.is;
-    output.uses_rs=ins.op!=FN;
-    output.tag=rob_in.next_tag();
+    output.valid = 1;
+    output.pc = current_pc;
+    output.raw = raw;
+    output.ins = ins;
+    output.rob_slot = rob_in.tail;
+    output.rs_slot = rs_slot;
+    output.lsq_slot = lsq_in.tail;
+    output.memory_op = ins.il || ins.is;
+    output.uses_rs = ins.op != FN;
+    output.tag = rob_in.next_tag();
 
-    if(ins.r1) rf_in.resolve_operand(ins.rs1, rob_in, output.v1, output.q1);
-    if(ins.r2) rf_in.resolve_operand(ins.rs2, rob_in, output.v2, output.q2);
+    if (ins.r1)
+      rf_in.resolve_operand(ins.rs1, rob_in, output.v1, output.q1);
+    if (ins.r2)
+      rf_in.resolve_operand(ins.rs2, rob_in, output.v2, output.q2);
 
-    if(ins.op==IA||ins.op==IS||ins.op==IM)
-    {
-        output.v2=static_cast<u32>(ins.imm);
-        output.q2=Tag{};
+    if (ins.op == IA || ins.op == IS || ins.op == IM) {
+      output.v2 = static_cast<u32>(ins.imm);
+      output.q2 = Tag{};
     }
 
-    if(ins.ib){
-        const bool taken=(prd_in.predict(current_pc)&1)!=0;
-        output.predicted_taken=taken;
-        output.next_pc= taken ? static_cast<u32>(current_pc+ins.imm) : current_pc+4;
-    }else if(ins.ij&&!ins.ijr){
-        output.next_pc=static_cast<u32>(current_pc+ins.imm);
-    }else{
-        output.next_pc=current_pc+4;
-    }   
+    if (ins.ib) {
+      const bool taken = (prd_in.predict(current_pc) & 1) != 0;
+      output.predicted_taken = taken;
+      output.next_pc =
+          taken ? static_cast<u32>(current_pc + ins.imm) : current_pc + 4;
+    } else if (ins.ij && !ins.ijr) {
+      output.next_pc = static_cast<u32>(current_pc + ins.imm);
+    } else {
+      output.next_pc = current_pc + 4;
+    }
 
     return output;
   }
+
+  void evaluate_module(u8 module, CycleWires &wires) const {
+    switch (module) {
+    case ROB_MODULE:
+      wires.commit = rob.evaluate(rf.arch(10));
+      break;
+    case RS_MODULE:
+      wires.execute = rs.evaluate(rob);
+      break;
+    case LSQ_MODULE:
+      wires.memory_request = lsq.evaluate(rob, memory_pipe);
+      break;
+    case FRONTEND_MODULE:
+      wires.issue = evaluate_frontend(pc, frz, term, fault, mem, prd, rf, rob,
+                                      rs, lsq, memory_pipe);
+      break;
+    case MEMORY_MODULE:
+      wires.memory = evaluate_memory(memory_pipe, mem);
+      break;
+    default:
+      break;
+    }
+  }
+  void resolve_control_wires(CycleWires &wires) const {
+    wires.fault_request = wires.issue.invalid_instruction &&
+                          rob.head == rob.tail && wires.commit.valid;
+  }
+  
 };
+
 } // namespace sim
