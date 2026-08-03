@@ -185,7 +185,7 @@ struct Simulator {
     return output;
   }
 
-  void evaluate_module(u8 module, CycleWires &wires) const {
+  void evaluate_module(Module module, CycleWires &wires) const {
     switch (module) {
     case ROB_MODULE:
       wires.commit = rob.evaluate(rf.arch(10));
@@ -211,7 +211,117 @@ struct Simulator {
     wires.fault_request = wires.issue.invalid_instruction &&
                           rob.head == rob.tail && wires.commit.valid;
   }
-  
+
+  void latch_rob(const CycleWires &wires) { rob.latch(wires); }
+  void latch_rs(const CycleWires &wires) { rs.latch(wires); }
+  void latch_lsq(const CycleWires &wires) { lsq.latch(wires); }
+  void latch_rf(const CycleWires &wires) { rf.latch(wires); }
+  void latch_frontend(const CycleWires &wires) {
+    if (wires.commit.terminate)
+      return;
+    if (wires.commit.redirect) {
+      pc = wires.commit.redirect_pc;
+      frz = 0;
+    } else if (accept_issue(wires)) {
+      pc = wires.issue.next_pc;
+      if (wires.issue.ins.ijr)
+        frz = 1;
+    }
+  }
+  void latch_predictor(const CycleWires &wires) {
+    if (wires.commit.branch)
+      prd.update(wires.commit.pc, wires.commit.value != 0,
+                 wires.commit.predicted_taken);
+  }
+  void latch_memory(const CycleWires &wires) {
+    if (wires.memory.valid && wires.memory.store) {
+      mem.dwrite(wires.memory.address, wires.memory.value,
+                 memory_size(wires.memory.operation));
+    }
+
+    MemoryPipelineState tmp = memory_pipe;
+    if (squash_cycle(wires)) {
+      tmp = MemoryPipelineState{};
+    } else {
+      if (memory_pipe.busy) {
+        if (wires.memory.valid) {
+          tmp = MemoryPipelineState{};
+        } else if (tmp.remaining > 1) {
+          tmp.remaining--;
+        } else if (wires.memory_request.valid) {
+          tmp.busy = true;
+          tmp.remaining = MEMORY_LATENCY;
+          tmp.request = wires.memory_request;
+        }
+      }
+    }
+    memory_pipe = tmp;
+  }
+
+  void latch_control(const CycleWires &wires) {
+    if (wires.commit.terminate) {
+      term = 1;
+      out = wires.commit.termination_value;
+    }
+    if (wires.fault_request) {
+      fault = 1;
+      fault_pc = wires.issue.pc;
+      fault_raw = wires.issue.raw;
+    }
+  }
+
+  void latch_module(Module module, const CycleWires &wires) {
+    switch (module) {
+    case ROB_MODULE:
+      latch_rob(wires);
+      break;
+    case RS_MODULE:
+      latch_rs(wires);
+      break;
+    case LSQ_MODULE:
+      latch_lsq(wires);
+      break;
+    case FRONTEND_MODULE:
+      latch_rf(wires);
+      latch_frontend(wires);
+      latch_predictor(wires);
+      latch_control(wires);
+      break;
+    case MEMORY_MODULE:
+      latch_memory(wires);
+      break;
+    default:
+      break;
+    }
+  }
+
+  void cycle_with_order(const u8 order[MODULE_COUNT]) {
+    if(term || fault)
+      return;
+    CycleWires wires{};
+
+    for(u32 i=0;i<MODULE_COUNT;++i)
+      evaluate_module(static_cast<Module>(order[i]), wires);
+
+    wires.cdb = cdb.evaluate(wires.execute, wires.memory);
+    resolve_control_wires(wires);
+
+    for(u32 i=0;i<MODULE_COUNT;++i)
+      latch_module(static_cast<Module>(order[i]), wires);
+    ++clk;
+  }
+
+  void cycle() {
+    u8 order[MODULE_COUNT];
+    const u8 rotation=static_cast<u8>(clk%MODULE_COUNT);
+    for(u32 i=0;i<MODULE_COUNT;++i)
+      order[i]=static_cast<u8>((i+rotation)%MODULE_COUNT);
+    cycle_with_order(order);
+  }
+
+  bool done() const { return term || fault; }
+  bool failed() const { return fault; }
+  u32 get_output() const { return out; }
 };
 
 } // namespace sim
