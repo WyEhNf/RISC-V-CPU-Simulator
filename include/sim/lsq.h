@@ -74,5 +74,4 @@ struct LSQ {
     }
     return -1;
   }
-};
-} // namespace sim
+}; // namespace sim
