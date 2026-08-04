@@ -20,8 +20,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Simulator fault at PC=0x%08X, raw=0x%08X\n",
                 sim.fault_pc, sim.fault_raw);
       else
-        fprintf(stderr, "Simulator terminated with output 0x%08X\n",
-                sim.get_output());
+         fprintf(stdout,"%u\n",sim.get_output());
       return sim.failed() ? 1 : 0;
     }
   }
