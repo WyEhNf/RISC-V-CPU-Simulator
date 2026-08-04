@@ -1,6 +1,8 @@
 #pragma once
 #include "sim/types.h"
-#include "module_io.h"
+#include "sim/module_io.h"
+#include "sim/rs.h"
+#include "sim/rob.h"
 namespace sim {
 struct RegFile {
   u32 rg[RN];

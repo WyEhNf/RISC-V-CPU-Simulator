@@ -33,7 +33,7 @@ if(BUILD_TESTING)
   add_executable(test_data tests/integration/test_data.cpp)
   target_include_directories(test_data PRIVATE include)
   target_compile_definitions(test_data PRIVATE
-      NEWIMPL_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+      SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
   add_test(NAME test_data COMMAND test_data)
   set_tests_properties(test_data PROPERTIES TIMEOUT 240 LABELS "integration;slow")
 endif()

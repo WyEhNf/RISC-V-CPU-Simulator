@@ -43,6 +43,7 @@ struct Simulator {
     rf = RegState{};
     rs = RSState{};
     lsq = LSQState{};
+    rob = ROBState{};
     memory_pipe = MemoryPipelineState{};
     prd.reset();
 
@@ -91,8 +92,8 @@ struct Simulator {
       return val & 0xffffu;
     return val;
   }
-  void resolve_operand(u32 reg, u32 value, Tag &dependency) const {
-    rf.resolve_operand(reg, rs, value, dependency);
+  void resolve_operand(u32 reg, u32 &value, Tag &dependency) const {
+    rf.resolve_operand(reg, rob, value, dependency);
   }
 
   static MemoryOutput evaluate_memory(const MemoryPipelineState &ppl,
@@ -118,7 +119,7 @@ struct Simulator {
   }
 
   static IssueOutput
-  evaluate_frontend(i32 current_pc, bool frozen, bool terminated, bool failed,
+  evaluate_frontend(u32 current_pc, bool frozen, bool terminated, bool failed,
                     const Mem &mem_in, const Predictor &prd_in,
                     const RegState &rf_in, const ROBState &rob_in,
                     const RSState &rs_in, const LSQState &lsq_in,
@@ -209,7 +210,7 @@ struct Simulator {
   }
   void resolve_control_wires(CycleWires &wires) const {
     wires.fault_request = wires.issue.invalid_instruction &&
-                          rob.head == rob.tail && wires.commit.valid;
+                          rob.head == rob.tail && !wires.commit.valid;
   }
 
   void latch_rob(const CycleWires &wires) { rob.latch(wires); }
@@ -248,11 +249,11 @@ struct Simulator {
           tmp = MemoryPipelineState{};
         } else if (tmp.remaining > 1) {
           tmp.remaining--;
-        } else if (wires.memory_request.valid) {
-          tmp.busy = true;
-          tmp.remaining = MEMORY_LATENCY;
-          tmp.request = wires.memory_request;
         }
+      } else if (wires.memory_request.valid) {
+        tmp.busy = true;
+        tmp.remaining = MEMORY_LATENCY;
+        tmp.request = wires.memory_request;
       }
     }
     memory_pipe = tmp;
@@ -296,26 +297,26 @@ struct Simulator {
   }
 
   void cycle_with_order(const u8 order[MODULE_COUNT]) {
-    if(term || fault)
+    if (term || fault)
       return;
     CycleWires wires{};
 
-    for(u32 i=0;i<MODULE_COUNT;++i)
+    for (u32 i = 0; i < MODULE_COUNT; ++i)
       evaluate_module(static_cast<Module>(order[i]), wires);
 
     wires.cdb = cdb.evaluate(wires.execute, wires.memory);
     resolve_control_wires(wires);
 
-    for(u32 i=0;i<MODULE_COUNT;++i)
+    for (u32 i = 0; i < MODULE_COUNT; ++i)
       latch_module(static_cast<Module>(order[i]), wires);
     ++clk;
   }
 
   void cycle() {
     u8 order[MODULE_COUNT];
-    const u8 rotation=static_cast<u8>(clk%MODULE_COUNT);
-    for(u32 i=0;i<MODULE_COUNT;++i)
-      order[i]=static_cast<u8>((i+rotation)%MODULE_COUNT);
+    const u8 rotation = static_cast<u8>(clk % MODULE_COUNT);
+    for (u32 i = 0; i < MODULE_COUNT; ++i)
+      order[i] = static_cast<u8>((i + rotation) % MODULE_COUNT);
     cycle_with_order(order);
   }
 

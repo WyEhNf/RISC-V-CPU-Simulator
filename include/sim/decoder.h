@@ -54,7 +54,7 @@ inline Ins decode(u32 raw) {
       d.alu = AF::SLTU;
       break;
     default:
-      d.alu = AF::NOP;
+      d.op  = Op::INV;
       break;
     }
     break;
