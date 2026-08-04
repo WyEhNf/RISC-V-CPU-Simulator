@@ -5,7 +5,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 add_executable(sim apps/sim.cpp)
 target_include_directories(sim PRIVATE include)
+set_target_properties(sim PROPERTIES OUTPUT_NAME code)
 
+option(BUILD_TESTING "Build unit and integration tests" OFF)
 include(CTest)
 if(BUILD_TESTING)
   set(UNIT_TESTS
@@ -33,7 +35,7 @@ if(BUILD_TESTING)
   add_executable(test_data tests/integration/test_data.cpp)
   target_include_directories(test_data PRIVATE include)
   target_compile_definitions(test_data PRIVATE
-      SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+      NEWIMPL_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
   add_test(NAME test_data COMMAND test_data)
   set_tests_properties(test_data PROPERTIES TIMEOUT 240 LABELS "integration;slow")
 endif()
