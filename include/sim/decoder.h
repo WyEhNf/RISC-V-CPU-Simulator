@@ -23,34 +23,34 @@ inline Ins decode(u32 raw) {
     d.rs2 = (u8)ex(raw, 20, 25);
     d.w = d.r1 = d.r2 = 1;
     switch (ex(raw, 12, 15) << 7 | ex(raw, 25, 32)) {
-    case 0b00000000000:
+    case 0b0000000000:
       d.alu = AF::ADD;
       break;
-    case 0b00000100000:
+    case 0b0000100000:
       d.alu = AF::SUB;
       break;
-    case 0b11100000000:
+    case 0b1110000000:
       d.alu = AF::AND;
       break;
-    case 0b11000000000:
+    case 0b1100000000:
       d.alu = AF::OR;
       break;
-    case 0b10000000000:
+    case 0b1000000000:
       d.alu = AF::XOR;
       break;
-    case 0b00100000000:
+    case 0b0010000000:
       d.alu = AF::SLL;
       break;
-    case 0b10100000000:
+    case 0b1010000000:
       d.alu = AF::SRL;
       break;
-    case 0b10101000000:
+    case 0b1010100000:
       d.alu = AF::SRA;
       break;
-    case 0b01000000000:
+    case 0b0100000000:
       d.alu = AF::SLT;
       break;
-    case 0b01100000000:
+    case 0b0110000000:
       d.alu = AF::SLTU;
       break;
     default:
